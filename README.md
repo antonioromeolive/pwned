@@ -1,3 +1,2 @@
 # pwned
-Check if a pasword (or a list of password) has been pwned using the https://haveibeenpwned.com/
-This work is not affiliated with the haveibeenpwned owner nor endorsed by it.
+this is a python script to check if a password (or a password list) has appeared in any data breach as per "haveIbeenpwed" website (Not affiliated)
