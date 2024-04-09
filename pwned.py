@@ -185,12 +185,12 @@ def printStats() -> None:
 
     print("\n")
     print("---------------------------------------------------------------")
-    print("Total number of passwords/hash read.......: " + "{:,}".format(loc_stats.number_of_password_read))
-    print("Total number of passwords/hash pwned......: " + "{:,}".format(loc_stats.pwned_passwords_found))
-    print("Total number of passwords/hash safe.......: " + "{:,}".format(loc_stats.safe_passwords_found))
-    print("Total number of passwords/hash read.......: " + "{:,}".format(loc_stats.number_of_password_read))
-    print("Total number of lines scanned in local db : " + "{:,}".format(loc_stats.scanned_lines_in_db))
-    print("Total elapsed time (sec)..................: " + "{0:.4f}".format(loc_stats.elapsed_time) + " (" + str(datetime.timedelta(seconds=loc_stats.elapsed_time)) + ")")
+    print(f"Total number of passwords/hash read.......: {loc_stats.number_of_password_read:,}")
+    print(f"Total number of passwords/hash pwned......: {loc_stats.pwned_passwords_found:,}")
+    print(f"Total number of passwords/hash safe.......: {loc_stats.safe_passwords_found:,}")
+    print(f"Total number of passwords/hash read.......: {loc_stats.number_of_password_read:,}")
+    print(f"Total number of lines scanned in local db : {loc_stats.scanned_lines_in_db:,}")
+    print(f"Total elapsed time (sec)..................: {loc_stats.elapsed_time:.4f} ({datetime.timedelta(seconds=loc_stats.elapsed_time)})")    
     print("---------------------------------------------------------------")
     print("PWNED - ver. " + loc_stats.PROGRAM_VERSION + " from A.R.")
     return 
@@ -458,7 +458,7 @@ def isHashPwnedLocalZip(l_hash, l_local_db_file, l_local_zip_file):
                     if (line_number % 100000) == 0:
                         #last_digit = (last_digit+1) % 10
                         #print(str(last_digit), end='', flush= True)
-                        print("Scanned lines:", "{:,}".format(line_number), end="\r") 
+                        print(f"Scanned lines: {line_number:,}", end="\r")
         except Exception as e:  
             # Code to handle the exception  
             debugLog("isHashPwnedLocalZip: Exception: " + str(e))
@@ -494,8 +494,8 @@ def isHashPwnedLocal(l_hash, l_local_db_file):
             if (line_number % 100000) == 0:
                 #last_digit = (last_digit+1) % 10
                 #print(str(last_digit), end='', flush= True)
-                print("Scanned lines:", "{:,}".format(line_number), end="\r") 
-                
+                print(f"Scanned lines: {line_number:,}", end="\r")
+
     loc_stats.number_of_password_read = 1
     loc_stats.pwned_passwords_found   = 0
     loc_stats.safe_passwords_found    = loc_stats.number_of_password_read - loc_stats.pwned_passwords_found
