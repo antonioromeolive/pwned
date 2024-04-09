@@ -1,3 +1,17 @@
+# PWNED - ver 1.0 - 08/05/2021
+# PWNED - ver 1.3 - 08/12/2021 Added -z switch (only support single password so far...)
+# PWNED - ver 2.0 - 13/04/2023 Added -b switch for "binary_search" if the password file is sorted
+# PWNED - ver 2.1 - 14/04/2023 added info at exit (printstats improvements)
+# Author: Antonio Romeo - Cinquefrondi (RC)
+# email: antonioromeoNO_SPAM@live.it
+# This software is free of charge for personal usage. Since it may use an online service (to check if a pwd has been "pwned")
+# the number of queries to the service may be subject to policy/licensing. I am not affiliated nor sponsored nor associated in any way 
+# with the provider of the service. You need to get the owner permission (https://haveibeenpwned.com) for any "extensive" usage.
+# My suggestion, if you have lot of pwd to check, is to download the hacked pwd DB from the same site and use it locally.
+# But anyway you are on your own.
+# Notes: when checking the password online, the pwd itself is NOT sent to anybody... checks are done against HASHED passwords 
+#        in a way to anonymize the pwd itself.
+# Feel free to send me any bug/improvement request. I will try to respond to anyone.
 """
 MIT License
 
@@ -21,35 +35,20 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
-
-# PWNED - ver 1.0 - 08/05/2021
-# PWNED - ver 1.3 - 08/12/2021 Added -z switch (only support single password so far...)
-# PWNED - ver 2.0 - 13/04/2023 Added -b switch for "binary_search" if the password file is sorted
-# PWNED - ver 2.1 - 14/04/2023 added info at exit (printstats improvements)
-# Author: Antonio Romeo - Cinquefrondi (RC)
-# email: antonioromeo@live.it
-# This software is free of charge for personal usage. Since it may use an online service (to check if a pwd has been "pwned")
-# the number of queries to the service may be subject to policy/licensing. I am not affiliated nor sponsored nor associated in any way 
-# with the provider of the service. You need to get the owner permission (https://haveibeenpwned.com) for any "extensive" usage.
-# My suggestion, if you have lot of pwd to check, is to download the hacked pwd DB from the same site and use it locally.
-# But anyway you are on your own.
-# Notes: when checking the password online, the pwd itself is NOT sent to anybody... checks are done against HASHED passwords 
-#        in a way to anonymize the pwd itself.
-# Feel free to send me any bug/improvement request. I will try to respond to anyone.
-
-import datetime
-import hashlib
-import requests
 import os
 import sys
+import datetime
+import hashlib
 import getopt
 import time
 import threading
 import zipfile
+import requests
 
-PROGRAM_VERSION="2.1"
-DEBUG_MODE = False
-SSL_CHECK  = True
+import pwned_stats as pstat
+
+my_stats = pstat.PwnedStats()
+my_stats.start_timer()
 
 HASH_PREFIX_LENGHT  = 5
 BASE_PWD_SEARCH_URL = 'https://api.pwnedpasswords.com/range/'
@@ -71,26 +70,15 @@ DB_LOCAL            = 2
 DB_LOCAL_SORTED     = 3
 DB_LOCAL_ZIP        = 4
 
-INPUT_MODES     = [IM_SINGLE_PASSOWRD, IM_PASSWORD_FILE, IM_TEXT_FILE]
-OPERATION_MODES = [OM_PLAIN, OM_HASH]
-DATABASE_MODES  = [DB_WEB, DB_LOCAL, DB_LOCAL_SORTED, DB_LOCAL_ZIP]
+INPUT_MODES: list[int]     = [IM_SINGLE_PASSOWRD, IM_PASSWORD_FILE, IM_TEXT_FILE]
+OPERATION_MODES: list[int] = [OM_PLAIN, OM_HASH]
+DATABASE_MODES: list[int]  = [DB_WEB, DB_LOCAL, DB_LOCAL_SORTED, DB_LOCAL_ZIP]
 
 ERR_NO_ERROR         = 0
 ERR_WRONG_PARAMETERS = 1
 ERR_OTHERS           = 2
 ERR_OPMODE_UNKNOWN   = 3
 ERR_NO_HASH_PASSWORD = 4
-
-#Global statistics:
-g_number_of_password_read = 0   #1 if from command 
-g_pwned_passwords_found   = 0
-g_safe_passwords_found    = 0
-g_scanned_lines_in_db     = 0  #if local db option used
-g_safe_passwords_invalid  = 0
-g_start_time              = 0
-g_stop_time               = 0
-g_elapsed_time            = 0
-
 
 
 #Constants for the -f implementation....
@@ -113,6 +101,43 @@ def lineToBeExcluded(line_tocheck, excluding_list):
 def wordToBeExcluded(word_tocheck, min_word_length):
     result = (len(word_tocheck) < min_word_length)
     return result
+
+def printColor(text: str, color:str="white") -> None:
+    #used by printcolor....
+    RU_COLOR_RED:str    = "\033[91m {}\033[00m"
+    RU_COLOR_GREEN:str  = "\033[92m {}\033[00m"
+    RU_COLOR_BLUE:str   = "\033[94m {}\033[00m"
+    RU_COLOR_YELLOW:str = "\033[93m {}\033[00m"
+    RU_COLOR_PINK:str   = "\033[95m {}\033[00m"
+    RU_COLOR_CYAN:str   = "\033[96m {}\033[00m"
+    RU_COLOR_WHITE:str  = "\033[97m {}\033[00m"
+    RU_COLOR_BLACK:str  = "\033[98m {}\033[00m"
+    RU_COLOR_GRAY:str   = "\033[99m {}\033[00m"
+
+    """ print a text in the defined color """
+    if color.strip().lower() == "red":
+        print(RU_COLOR_RED .format(text))
+    elif color.strip().lower() == "green":
+        print(RU_COLOR_GREEN .format(text))
+    elif color.strip().lower() == "blue":
+        print(RU_COLOR_BLUE .format(text))
+    elif color.strip().lower() == "yellow":
+        print(RU_COLOR_YELLOW .format(text))
+    elif color.strip().lower() == "pink":
+        print(RU_COLOR_PINK .format(text))
+    elif color.strip().lower() == "cyan":
+        print(RU_COLOR_CYAN .format(text))
+    elif color.strip().lower() == "white":
+        print(RU_COLOR_WHITE .format(text))
+    elif color.strip().lower() == "black":
+        print(RU_COLOR_BLACK .format(text))
+    elif color.strip().lower() == "gray":
+        print(RU_COLOR_GRAY .format(text))
+    else:
+        print(text)
+
+    return
+
 
 def getPasswordList(filename):
     # def __init__(self, src_password, src_hash, found_filename, found_linenumber, ispwned=False):
@@ -152,31 +177,48 @@ class password_record:
         self.ispwned = ispwned
 
 
-def printStats():
-    global g_start_time
-    global g_stop_time
-    global g_elapsed_time
-    global PROGRAM_VERSION
-    g_stop_time = time.time()
-    g_elapsed_time = g_stop_time - g_start_time
+def printStats() -> None:
+
+    loc_stats = pstat.PwnedStats()
+    loc_stats.stop_timer()
+    loc_stats.elapsed_time = loc_stats.elapsed_time 
 
     print("\n")
     print("---------------------------------------------------------------")
-    print("Total number of passwords/hash read.......: " + "{:,}".format(g_number_of_password_read))
-    print("Total number of passwords/hash pwned......: " + "{:,}".format(g_pwned_passwords_found))
-    print("Total number of passwords/hash safe.......: " + "{:,}".format(g_safe_passwords_found))
-    print("Total number of passwords/hash read.......: " + "{:,}".format(g_number_of_password_read))
-    print("Total number of lines scanned in local db : " + "{:,}".format(g_scanned_lines_in_db))
-    print("Total elapsed time (sec)..................: " + "{0:.4f}".format(g_elapsed_time) + " (" + str(datetime.timedelta(seconds=g_elapsed_time)) + ")")
+    print("Total number of passwords/hash read.......: " + "{:,}".format(loc_stats.number_of_password_read))
+    print("Total number of passwords/hash pwned......: " + "{:,}".format(loc_stats.pwned_passwords_found))
+    print("Total number of passwords/hash safe.......: " + "{:,}".format(loc_stats.safe_passwords_found))
+    print("Total number of passwords/hash read.......: " + "{:,}".format(loc_stats.number_of_password_read))
+    print("Total number of lines scanned in local db : " + "{:,}".format(loc_stats.scanned_lines_in_db))
+    print("Total elapsed time (sec)..................: " + "{0:.4f}".format(loc_stats.elapsed_time) + " (" + str(datetime.timedelta(seconds=loc_stats.elapsed_time)) + ")")
     print("---------------------------------------------------------------")
-    print("PWNED - ver. " + PROGRAM_VERSION + " from A.R.")
+    print("PWNED - ver. " + loc_stats.PROGRAM_VERSION + " from A.R.")
     return 
 
-def debugLog(string_variable):
-    global DEBUG_MODE
-    if DEBUG_MODE:
-        print("DEBUG: " + string_variable)
+
+def debugLog(any_variable, color: str = "gray", calling_function:str="") -> None:
+    """ 
+    print a stringin color if DEBUG_MODE=True. Also write on file if DEBUG_ON_FILE is True
+    """
+    loc_stats = pstat.PwnedStats()
+    l_DEBUG_MODE: bool = loc_stats.DEBUG_MODE
+    DEBUG_ON_FILE: bool = loc_stats.DEBUG_ON_FILE
+    DEBUG_FILENAME: str = loc_stats.DEBUG_FILENAME
+
+    timestamp: str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    debug_string:str = timestamp + " - " + calling_function + " - " + str(any_variable)
+    if l_DEBUG_MODE:
+        #print('DEBUG: ', end='')  
+        printColor(debug_string, color)
+    
+    if DEBUG_ON_FILE:
+        
+        with open(DEBUG_FILENAME, "a", encoding="utf-8") as file:
+            file.write(debug_string + "\n")
+
     return
+
 
 def alwaysLog(string_variable):
     print(string_variable)
@@ -185,7 +227,7 @@ def alwaysLog(string_variable):
     
 def readTextPasswordFromTextFile(l_cli_password_file, l_inputmode=OM_PLAIN):
     result = []
-    file = open(l_cli_password_file, 'r', errors='ignore')
+    file = open(l_cli_password_file, 'r', encoding='utf-8', errors='ignore')
     lines = file.readlines()
     file_line:int=0
     if l_inputmode==OM_PLAIN:
@@ -234,7 +276,7 @@ def writeOnePassword(l_outputfilename, found_filename, src_password, src_hash, f
 
     if (l_outputfilename != ""):
         line_output=found_filename + ", " + str(found_linenumber) + "," + src_password + ", " + src_hash  + "," + str(i_ispwned) + "\n"
-        l_outfile = open(l_outputfilename, 'a', newline='\n')
+        l_outfile = open(l_outputfilename, 'a', encoding='utf-8', newline='\n')
         
         l_outfile.writelines(line_output)
         l_outfile.close()
@@ -353,13 +395,11 @@ def checkSinglePassword(l_password, l_current_input_mode, l_current_db_mode, l_c
 def checkPlainPasswordFile(l_cli_password_file, l_current_db_mode, l_cli_local_db_file, l_cli_output_file, l_inputmode=OM_PLAIN, l_delay_secs=0):
     debugLog("checkPlainPasswordFile(" + l_cli_password_file + "," + str(l_current_db_mode) + "," +l_cli_local_db_file + "," + l_cli_output_file +","+ str(l_inputmode) + "," + str(l_delay_secs)+")")
 
-    global g_number_of_password_read
-    global g_pwned_passwords_found
-    global g_safe_passwords_found
+    loc_stats = pstat.PwnedStats()
     
     list_to_check = []  
     list_to_check = readTextPasswordFromTextFile(l_cli_password_file, l_inputmode)
-    g_number_of_password_read = len(list_to_check)
+    loc_stats.number_of_password_read = len(list_to_check)
     if (l_current_db_mode == DB_WEB):
         for current in list_to_check:
             current.ispwned=isHashPwnedRemoteWithPwd(current.src_hash, current.src_password)
@@ -376,12 +416,10 @@ def checkPlainPasswordFile(l_cli_password_file, l_current_db_mode, l_cli_local_d
 
 def checkTextFile(l_word_list, l_current_db_mode, l_cli_local_db_file, l_cli_output_file, l_delay_secs):
     debugLog("checkTextFile(l_word_list, " + str(l_current_db_mode) + "," + l_cli_local_db_file + "," + l_cli_output_file + ")")
-    global g_number_of_password_read
-    global g_pwned_passwords_found
-    global g_safe_passwords_found
     
     list_to_check = l_word_list
-    g_number_of_password_read = len(list_to_check)
+    loc_stats = pstat.PwnedStats()
+    loc_stats.number_of_password_read = len(list_to_check)
     if (l_current_db_mode == DB_WEB):
         for current in list_to_check:
             current.ispwned=isHashPwnedRemoteWithPwd(current.src_hash, current.src_password)
@@ -399,12 +437,7 @@ def isHashPwnedLocalZip(l_hash, l_local_db_file, l_local_zip_file):
     debugLog("isHashPwnedLocalZip(" + l_hash + "," + l_local_db_file + ", " + l_local_zip_file + ")")
     result= False
     line_number=0
-    global g_number_of_password_read
-    global g_pwned_passwords_found
-    global g_safe_passwords_found
-    global g_scanned_lines_in_db
-    #last_digit = 0
-
+    loc_stats = pstat.PwnedStats()
 
     with zipfile.ZipFile(l_local_zip_file) as z:
         #surround with try catch
@@ -414,10 +447,10 @@ def isHashPwnedLocalZip(l_hash, l_local_db_file, l_local_zip_file):
                 for the_line in f:
                     line_number = line_number + 1
                     if (l_hash.encode() in the_line):
-                        g_number_of_password_read = 1
-                        g_pwned_passwords_found   = 1
-                        g_safe_passwords_found    = g_number_of_password_read - g_pwned_passwords_found
-                        g_scanned_lines_in_db     = line_number 
+                        loc_stats.number_of_password_read = 1
+                        loc_stats.pwned_passwords_found   = 1
+                        loc_stats.safe_passwords_found    = loc_stats.number_of_password_read - loc_stats.pwned_passwords_found 
+                        loc_stats.scanned_lines_in_db     = line_number 
                         result=True
                         print(l_hash + " FOUND on line " + str(line_number) + " of file " + l_local_db_file)
                         debugLog("isHashPwnedLocalZip result=" + str(result))
@@ -431,10 +464,10 @@ def isHashPwnedLocalZip(l_hash, l_local_db_file, l_local_zip_file):
             debugLog("isHashPwnedLocalZip: Exception: " + str(e))
             print("\nERROR: " + l_local_db_file + " file NOT FOUND inside " + l_local_zip_file + ". Exiting...") 
     
-    g_number_of_password_read = 1
-    g_pwned_passwords_found   = 0
-    g_safe_passwords_found    = g_number_of_password_read - g_pwned_passwords_found
-    g_scanned_lines_in_db     = line_number                 
+    loc_stats.number_of_password_read = 1
+    loc_stats.pwned_passwords_found   = 0
+    loc_stats.safe_passwords_found    = loc_stats.number_of_password_read - loc_stats.pwned_passwords_found
+    loc_stats.scanned_lines_in_db     = line_number                 
     return result
 
 
@@ -443,20 +476,16 @@ def isHashPwnedLocal(l_hash, l_local_db_file):
     
     result= False
     line_number=0
-    global g_number_of_password_read
-    global g_pwned_passwords_found
-    global g_safe_passwords_found
-    global g_scanned_lines_in_db
+    loc_stats = pstat.PwnedStats()
 
-
-    with open(l_local_db_file, 'r') as read_obj:
+    with open(l_local_db_file, 'r', encoding='utf-8') as read_obj:
         for the_line in read_obj:
             line_number = line_number + 1
             if (l_hash in the_line):
-                g_number_of_password_read = 1
-                g_pwned_passwords_found   = 1
-                g_safe_passwords_found    = g_number_of_password_read - g_pwned_passwords_found
-                g_scanned_lines_in_db     = line_number 
+                loc_stats.number_of_password_read = 1
+                loc_stats.pwned_passwords_found   = 1
+                loc_stats.safe_passwords_found    = loc_stats.number_of_password_read - loc_stats.pwned_passwords_found
+                loc_stats.scanned_lines_in_db     = line_number 
                 result=True
                 print("")
                 print(l_hash + " FOUND on line " + str(line_number) + " of file " + l_local_db_file)
@@ -467,51 +496,46 @@ def isHashPwnedLocal(l_hash, l_local_db_file):
                 #print(str(last_digit), end='', flush= True)
                 print("Scanned lines:", "{:,}".format(line_number), end="\r") 
                 
-    g_number_of_password_read = 1
-    g_pwned_passwords_found   = 0
-    g_safe_passwords_found    = g_number_of_password_read - g_pwned_passwords_found
-    g_scanned_lines_in_db     = line_number                 
+    loc_stats.number_of_password_read = 1
+    loc_stats.pwned_passwords_found   = 0
+    loc_stats.safe_passwords_found    = loc_stats.number_of_password_read - loc_stats.pwned_passwords_found
+    loc_stats.scanned_lines_in_db     = line_number                 
     return result
 
 #write a function like isHashPwnedLocal but using binary search in the l_local_db_file
 def isHashPwnedLocalBinary(l_hash, l_local_db_file):
     debugLog("isHashPwnedLocalBinary(" + l_hash + "," + l_local_db_file + ")")
-
-    global g_number_of_password_read
-    global g_pwned_passwords_found
-    global g_safe_passwords_found
-    global g_scanned_lines_in_db
-
+    loc_stats = pstat.PwnedStats()
 
     #binary search of l_hash in l_local_db_file
     
-    g_scanned_lines_in_db = 0
+    loc_stats.scanned_lines_in_db = 0
     mid = 0
     with open(l_local_db_file, 'r', encoding='utf-8') as f:
         left = 0
         right = f.seek(0, 2) # Seek to end of file
         while left <= right:
-            g_scanned_lines_in_db = g_scanned_lines_in_db + 1
+            loc_stats.scanned_lines_in_db = loc_stats.scanned_lines_in_db + 1
             #print(str(g_scanned_lines_in_db), end='', flush= True)
-            print("Lines scanned:", g_scanned_lines_in_db, end="\r") 
+            print("Lines scanned:", loc_stats.scanned_lines_in_db, end="\r") 
             mid = (left + right) // 2
             f.seek(mid)
             f.readline() # Discard the partial line
             line = f.readline().strip()
             if line.startswith(l_hash):
-                g_number_of_password_read = 1
-                g_pwned_passwords_found   = 1
-                g_safe_passwords_found    = 0
+                loc_stats.number_of_password_read = 1
+                loc_stats.pwned_passwords_found   = 1
+                loc_stats.safe_passwords_found    = 0
                 return True
             elif line < l_hash:
                 left = mid + 1
             else:
                 right = mid - len(line) - 1
 
-    g_number_of_password_read = 1
-    g_pwned_passwords_found   = 0
-    g_safe_passwords_found    = 1
-    g_scanned_lines_in_db     = mid                 
+    loc_stats.number_of_password_read = 1
+    loc_stats.pwned_passwords_found   = 0
+    loc_stats.safe_passwords_found    = 1
+    loc_stats.scanned_lines_in_db     = mid                 
     return False 
   
 
@@ -523,15 +547,13 @@ def isHashListPwnedLocalBinary(list_records, l_local_db_file, l_outputfilename, 
     local_result = False
     total_records = len(list_records)
     true_records  = 0
-    global g_number_of_password_read
-    global g_pwned_passwords_found
-    global g_safe_passwords_found
-    global g_scanned_lines_in_db
 
-    g_number_of_password_read = 0
+    loc_stats = pstat.PwnedStats()    
+
+    loc_stats.number_of_password_read = 0
     #for all objects in list_records call isHashPwnedLocalBinary
     for current_record in list_records:
-        g_number_of_password_read = g_number_of_password_read +1
+        loc_stats.number_of_password_read = loc_stats.number_of_password_read +1
         local_result = isHashPwnedLocalBinary(current_record.src_hash, l_local_db_file)
         result = result or local_result
         if (local_result):
@@ -543,13 +565,13 @@ def isHashListPwnedLocalBinary(list_records, l_local_db_file, l_outputfilename, 
             current_record.src_password + " -" + current_record.src_hash + " FOUND on line " + str(line_number) +
             " of file " + l_local_db_file + " - " + str(total_records-true_records) + " pwds to check...")
         else:
-            g_safe_passwords_found = g_safe_passwords_found + 1
+            loc_stats.safe_passwords_found = loc_stats.safe_passwords_found + 1
             current_record.ispwned=False
 
-    g_number_of_password_read = total_records
-    g_pwned_passwords_found   = true_records
-    g_safe_passwords_found    = g_number_of_password_read - g_pwned_passwords_found
-    g_scanned_lines_in_db     = line_number
+    loc_stats.number_of_password_read = total_records
+    loc_stats.pwned_passwords_found   = true_records
+    loc_stats.safe_passwords_found    = loc_stats.number_of_password_read - loc_stats.pwned_passwords_found
+    loc_stats.scanned_lines_in_db     = line_number
     writeListOfRecords(l_outputfilename, list_records)
     return result
 
@@ -561,10 +583,7 @@ def isHashListPwnedLocal(list_records, l_local_db_file, l_outputfilename, l_inpu
     
     total_records = len(list_records)
     true_records  = 0
-    global g_number_of_password_read
-    global g_pwned_passwords_found
-    global g_safe_passwords_found
-    global g_scanned_lines_in_db
+    loc_stats = pstat.PwnedStats()    
 
     with open(l_local_db_file, 'r', encoding='utf-8') as read_obj:
         for the_line in read_obj:
@@ -582,10 +601,10 @@ def isHashListPwnedLocal(list_records, l_local_db_file, l_outputfilename, l_inpu
                 else:
                     debugLog("isHashListPwnedLocal: exit and return... no more passwords to check. Total scanned lines: " + str(line_number))
                     writeListOfRecords(l_outputfilename, list_records)
-                    g_number_of_password_read = total_records
-                    g_pwned_passwords_found   = true_records
-                    g_safe_passwords_found    = g_number_of_password_read - g_pwned_passwords_found
-                    g_scanned_lines_in_db     = line_number #if local db option used
+                    loc_stats.number_of_password_read = total_records
+                    loc_stats.pwned_passwords_found   = true_records
+                    loc_stats.safe_passwords_found    = loc_stats.number_of_password_read - loc_stats.pwned_passwords_found
+                    loc_stats.scanned_lines_in_db     = line_number #if local db option used
                     return
             if (line_number % 100000) == 0:
                 #last_digit = (last_digit+1) % 10
@@ -593,19 +612,16 @@ def isHashListPwnedLocal(list_records, l_local_db_file, l_outputfilename, l_inpu
                 print("Scanned lines:", "{:,}".format(line_number), end="\r") 
         print("isHashListPwnedLocal - All passwords checked. Total scanned lines: " + str(line_number))
     writeListOfRecords(l_outputfilename, list_records)
-    g_number_of_password_read = total_records
-    g_pwned_passwords_found   = true_records
-    g_safe_passwords_found    = g_number_of_password_read - g_pwned_passwords_found
-    g_scanned_lines_in_db     = line_number #if local db option used
+    loc_stats.number_of_password_read = total_records
+    loc_stats.pwned_passwords_found   = true_records
+    loc_stats.safe_passwords_found    = loc_stats.number_of_password_read - loc_stats.pwned_passwords_found
+    loc_stats.scanned_lines_in_db     = line_number #if local db option used
     return result
 
 def checkListAgainstLineMT(list_records, l_line, thread_name):
     debugLog("checkListAgainstLineMT(" + "list_records" + "," + l_line+ "," + thread_name)
     number_of_true_records_found = 0
-    global g_number_of_password_read
-    global g_pwned_passwords_found
-    global g_safe_passwords_found
-    global g_scanned_lines_in_db
+
     for current_record in list_records:
         if current_record.ispwned is False:
             if (current_record.src_hash in l_line):
@@ -625,11 +641,8 @@ def isHashListPwnedLocalMT(list_records, l_local_db_file, l_outputfilename, l_in
     
     total_records = len(list_records)
     true_records  = 0
-    global g_number_of_password_read
-    global g_pwned_passwords_found
-    global g_safe_passwords_found
-    global g_scanned_lines_in_db
     list_of_threads = []
+    loc_stats = pstat.PwnedStats()    
 
     with open(l_local_db_file, 'r', encoding='utf-8') as read_obj:
         for the_line in read_obj:
@@ -650,10 +663,10 @@ def isHashListPwnedLocalMT(list_records, l_local_db_file, l_outputfilename, l_in
         print("isHashListPwnedLocalMT - All passwords checked. Total scanned lines: " + str(line_number))
     
     writeListOfRecords(l_outputfilename, list_records)
-    g_number_of_password_read = total_records
-    g_pwned_passwords_found   = true_records
-    g_safe_passwords_found    = g_number_of_password_read - g_pwned_passwords_found
-    g_scanned_lines_in_db     = line_number #if local db option used
+    loc_stats.number_of_password_read = total_records
+    loc_stats.pwned_passwords_found   = true_records
+    loc_stats.safe_passwords_found    = loc_stats.number_of_password_read - loc_stats.pwned_passwords_found
+    loc_stats.scanned_lines_in_db     = line_number #if local db option used
     return result
 
 def isHashPwnedRemote(l_hash):
@@ -664,15 +677,12 @@ def isHashPwnedRemoteWithPwd(l_hash, l_password):
     result = False
     the_hashed_prefix = l_hash[0:(HASH_PREFIX_LENGHT)]
     the_hashed_suffix = l_hash[HASH_PREFIX_LENGHT:len(l_hash)]
-    global g_pwned_passwords_found
-    global g_number_of_password_read
-    global g_safe_passwords_found
-    global g_safe_passwords_invalid
+    loc_stats = pstat.PwnedStats()
 
     final_url = BASE_PWD_SEARCH_URL + the_hashed_prefix
 
     #WARNING_ verify=false added only on this local copy to avoid checking ssl certificate
-    response = requests.get(final_url, timeout=10, verify=SSL_CHECK)
+    response = requests.get(final_url, timeout=10, verify=loc_stats.SSL_CHECK)
 
     if response.status_code == 200:
         print('Web service returned success status 200')
@@ -680,20 +690,20 @@ def isHashPwnedRemoteWithPwd(l_hash, l_password):
         if (the_hashed_suffix in response.text):
             print(l_password + " (Hash = " + l_hash + ") FOUND! This password is PWNED")
             result = True
-            g_pwned_passwords_found    = g_pwned_passwords_found + 1
+            loc_stats.pwned_passwords_found    = loc_stats.pwned_passwords_found + 1
         else:
             print(l_password + " (Hash = " + l_hash + ") NOT FOUND! This password is SAFE")
             result = False
-            g_safe_passwords_found    = g_safe_passwords_found + 1 
+            loc_stats.safe_passwords_found    = loc_stats.safe_passwords_found + 1 
     elif response.status_code == 404:
         print('ERROR 404 - Page not Found.')
-        g_safe_passwords_invalid = g_safe_passwords_invalid+1
+        loc_stats.safe_passwords_invalid = loc_stats.safe_passwords_invalid+1
     elif response.status_code == 429:
         print('ERROR 429 - rate limit exceeded. No Retry')
-        g_safe_passwords_invalid = g_safe_passwords_invalid+1
+        loc_stats.safe_passwords_invalid = loc_stats.safe_passwords_invalid+1
     elif response.status_code == 400:
         print('ERROR 400 - The hash prefix was not valid hexadecimal')
-        g_safe_passwords_invalid = g_safe_passwords_invalid+1
+        loc_stats.safe_passwords_invalid = loc_stats.safe_passwords_invalid+1
     else:
         print('ERROR Unknown: ' + str(response.status_code) + ' ' + response.text)
     
@@ -734,10 +744,10 @@ def isPasswordPwned(password_to_check):
 #*********************************************
 #          MAIN is HERE
 #*********************************************
-g_start_time = time.time()
+g_start_time:float = my_stats.start_time
 debugLog(str(g_start_time) + 'This program is now in DEBUG mode. To change put DEBUG_MODE = False at the beginning of the file.')
-print("PWNED - ver. " + PROGRAM_VERSION + " from A.R. is starting...")
-debugLog("WARNING - SSL Check is now " + str(SSL_CHECK) + ". To change update value on SSL_CHECK variable")
+print("PWNED - ver. " + my_stats.PROGRAM_VERSION + " from A.R. is starting...")
+debugLog("WARNING - SSL Check is now " + str(my_stats.SSL_CHECK) + ". To change update value on SSL_CHECK variable")
 
 #Global operation modes and variables - by default the WEB service is used and input assumed in PLAIN TEXT mode
 current_operation_mode  = IM_UNKNOWN_MODE
@@ -862,13 +872,13 @@ try:
         elif currentArgument in ("-h", "--help"):
             showHelp()
             alwaysLog("-h or --help found - Ignoring other parameters...")
-            print("PWNED - ver. " + PROGRAM_VERSION + " from A.R.")
+            print("PWNED - ver. " + my_stats.PROGRAM_VERSION + " from A.R.")
             os._exit(ERR_NO_ERROR)
         
         else:
             print("Unknow parameter")
             showHelp()
-            print("PWNED - ver. " + PROGRAM_VERSION + " from A.R.")
+            print("PWNED - ver. " + my_stats.PROGRAM_VERSION + " from A.R.")
             os._exit(ERR_WRONG_PARAMETERS)
         debugLog("cli_input_mode="+ str(cli_input_mode) + " - cli_db_mode=" + str(cli_db_mode) + " - current_operation_mode=" + str(current_operation_mode))
 
@@ -876,7 +886,7 @@ except getopt.error as err:
     # output error, and return with an error code
     print("Argument parsing error: " + str(err))
     #showHelp()
-    print("PWNED - ver. " + PROGRAM_VERSION + " from A.R.")
+    print("PWNED - ver. " + my_stats.PROGRAM_VERSION + " from A.R.")
     os._exit(ERR_WRONG_PARAMETERS)
 
 #anykey("Press 'q' or Ctrl-C to quit or anything else to continue....")
@@ -906,7 +916,7 @@ if current_operation_mode == IM_SINGLE_PASSOWRD:
     # We are in single password mode
     assert not cli_password==""
     print("Searching for a single password...: " + cli_password)
-    g_number_of_password_read = 1
+    my_stats.number_of_password_read = 1
     checkSinglePassword(cli_password, cli_input_mode, cli_db_mode, cli_local_db_file, cli_local_zip, cli_output_file)
     printStats()
 
