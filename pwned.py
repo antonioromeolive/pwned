@@ -595,9 +595,13 @@ def isHashListPwnedLocal(list_records, l_local_db_file, l_outputfilename, l_inpu
                             result=result or True
                             true_records = true_records + 1
                             current_record.ispwned = True
-                            print("\n" + current_record.found_filename + "(" + str(current_record.found_linenumber) + ") -" +
-                                current_record.src_password + " -" + current_record.src_hash + " FOUND on line " + str(line_number) +
-                                " of file " + l_local_db_file + " - " + str(total_records-true_records) + " pwds to check...")
+                            print("\n", end="")
+                            print(current_record.found_filename, end="")
+                            print("(" + str(current_record.found_linenumber) + ") -", end="")
+                            print(current_record.src_password, end="")
+                            print(" -" + current_record.src_hash + " FOUND on line " + str(line_number), end="")
+                            print(" of file " + l_local_db_file + " - " + str(total_records-true_records) + " pwds to check...")
+
                 else:
                     debugLog("isHashListPwnedLocal: exit and return... no more passwords to check. Total scanned lines: " + str(line_number))
                     writeListOfRecords(l_outputfilename, list_records)
@@ -932,8 +936,8 @@ elif current_operation_mode == IM_PASSWORD_FILE:
 
 elif current_operation_mode == IM_TEXT_FILE: 
     assert cli_text_file!=""
-    if (not os.path.isfile(cli_local_db_file)):
-        alwaysLog("ERROR: -l " + cli_local_db_file + " not found. Exiting...")
+    if (not os.path.isfile(cli_text_file)):
+        alwaysLog("ERROR: -l " + cli_text_file + " not found. Exiting...")
         os._exit(ERR_WRONG_PARAMETERS)
 
     print("Searching for text file: " + cli_text_file)
