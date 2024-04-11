@@ -1,0 +1,10 @@
+chat/*
+__pycache__/*
+dist/*
+build/*
+deprecated/*
+.vs/*
+*.properties
+*.log
+samples/*
+myLocalChatGPT4/*

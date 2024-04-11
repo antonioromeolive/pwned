@@ -1,6 +1,7 @@
 import unittest
 from pwned import isHashPwnedLocalZip
 
+
 class TestIsHashPwnedLocalZip(unittest.TestCase):
     def test_valid_hash(self):
         self.assertTrue(isHashPwnedLocalZip("5BAA61E4C9B93F3F0682250B6CF8331B7EE68FD8", "local_db_file", "local_zip_file"))
@@ -16,7 +17,4 @@ class TestIsHashPwnedLocalZip(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-    
-
-
     
